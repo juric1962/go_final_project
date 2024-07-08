@@ -1,8 +1,6 @@
 package tasks
 
 import (
-	"database/sql"
-
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -13,42 +11,29 @@ type Task struct {
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
 	Repeat  string `json:"repeat"`
-	/*
-	   ID      string `json:"id,omitempty"`
-	   Date    string `json:"date,omitempty"`
-	   Title   string `json:"title,omitempty"`
-	   Comment string `json:"comment,omitempty"`
-	   Repeat  string `json:"repeat,omitempty"`
-	*/
 }
 
-// RepID ...
-type RepID struct {
+// ResID ...
+type ResID struct {
 	ID string `json:"id"`
 }
 
-// RepJSON ...
-type RepJSON struct {
+// ResJSON ...
+type ResJSON struct {
 	Token string `json:"token"`
 }
 
-// RepErr ...
-type RepErr struct {
+// ResErr ...
+type ResErr struct {
 	Error string `json:"error"`
 }
 
-// Dbinstance ...
-type Dbinstance struct {
-	Db *sql.DB
-}
-
-// Ta ...
-type Ta struct {
+// Tasks ...
+type Tasks struct {
 	Tasks []Task `json:"tasks"`
 }
 
-type PSW struct {
+// Password
+type Password struct {
 	Password string `json:"password"`
 }
-
-var DB Dbinstance

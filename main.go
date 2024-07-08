@@ -2,25 +2,39 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/juric1962/go_final_project/auth"
+	"github.com/juric1962/go_final_project/dbhandler"
 	"github.com/juric1962/go_final_project/handlers"
-	"github.com/juric1962/go_final_project/tasks"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
+	errPort := errors.New("не опрелен порт в переменной окружения TODO_PORT")
+	errDB := errors.New("не определен путь к scheduler.db в переменной окружения TODO_DB")
+	path := os.Getenv("TODO_DB")
+	if len(path) == 0 {
+		panic(errDB)
+	}
+	port := os.Getenv("TODO_PORT")
+	if len(port) == 0 {
+		panic(errPort)
+	}
+
 	db, err := sql.Open("sqlite3", "./scheduler.db")
 	if err != nil {
 		fmt.Println(" No data base !")
 	}
 	defer db.Close()
-	tasks.DB = tasks.Dbinstance{
-		Db: db,
-	}
+	///tasks.DB = tasks.Dbinstance{
+	//	Db: db,
+	//}
+	dbhandler.Todo = dbhandler.NewTodoList(db)
 	r := chi.NewRouter()
 	r.Get("/", handlers.HandleMain)
 	r.Get("/index.html", handlers.HandleMain)
@@ -42,7 +56,10 @@ func main() {
 	r.Post("/api/signin", auth.HandleApiAuthPost)
 
 	r.Post("/api/signin/test", auth.HandleApiAuthPostTestingCookie)
-	err = http.ListenAndServe(":7540", r)
+
+	//err = http.ListenAndServe(":7540", r)
+	fmt.Printf(" server start port =%s  \n path database =%s\n", port, path)
+	err = http.ListenAndServe(":"+port, r)
 	if err != nil {
 		panic(err)
 	}
