@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/juric1962/go_final_project/dbhandler"
 	"github.com/juric1962/go_final_project/nextdate"
 	"github.com/juric1962/go_final_project/tasks"
@@ -41,13 +44,14 @@ func AddTask(task tasks.Task, w http.ResponseWriter, next string) {
 
 // UpdateTask
 func UpdateTask(task tasks.Task, w http.ResponseWriter, next string) {
-	_, err := dbhandler.Todo.SelectWhereId(task)
+	_, err := dbhandler.Todo.GetTask(task.ID)
 	if err != nil {
 		resJson, _ := json.Marshal(tasks.ResErr{Error: "Задача не найдена"})
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
-	err = dbhandler.Todo.Update(task, next)
+	task.Date = next
+	err = dbhandler.Todo.UpdateDB(task)
 	if err == nil {
 		resJson := []byte("{}")
 		SendHttp(resJson, w, http.StatusOK)
@@ -64,7 +68,7 @@ func HandleAPINextDay(w http.ResponseWriter, req *http.Request) {
 	now := req.FormValue("now")
 	date := req.FormValue("date")
 	repeat := req.FormValue("repeat")
-	start, _ := time.Parse("20060102", now)
+	start, _ := time.Parse(tasks.TimeFormat, now)
 	res, _ := nextdate.NextDate(start, date, repeat)
 	SendHttp([]byte(res), w, http.StatusOK)
 }
@@ -182,12 +186,12 @@ func HandleApiTaskPost(w http.ResponseWriter, r *http.Request) {
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
-	now := time.Now().Format(`20060102`)
+	now := time.Now().Format(tasks.TimeFormat)
 	if len(task.Date) == 0 {
 		task.Date = now
 	}
 	_, err = nextdate.NextDate(time.Now(), task.Date, "y")
-	start, err1 := time.Parse("20060102", task.Date)
+	start, err1 := time.Parse(tasks.TimeFormat, task.Date)
 	if err1 != nil || len(task.Title) == 0 || err != nil {
 		replyErr := tasks.ResErr{Error: "правило указано в неправильном формате"}
 		resJson, _ := json.Marshal(replyErr)
@@ -228,8 +232,7 @@ func HandleApiTaskGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p tasks.Task
-	p.ID = id
-	p, err := dbhandler.Todo.SelectWhereId(p)
+	p, err := dbhandler.Todo.GetTask(id)
 	if err == nil {
 		resJson, _ := json.Marshal(p)
 		SendHttp(resJson, w, http.StatusOK)
@@ -256,12 +259,12 @@ func HandleApiTaskPut(w http.ResponseWriter, r *http.Request) {
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
-	now := time.Now().Format(`20060102`)
+	now := time.Now().Format(tasks.TimeFormat)
 	if len(task.Date) == 0 {
 		task.Date = now
 	}
 	_, err = nextdate.NextDate(time.Now(), task.Date, "y")
-	start, err1 := time.Parse("20060102", task.Date)
+	start, err1 := time.Parse(tasks.TimeFormat, task.Date)
 	if err1 != nil || len(task.Title) == 0 || err != nil {
 		replyErr := tasks.ResErr{Error: "правило указано в неправильном формате"}
 		resJson, _ := json.Marshal(replyErr)
@@ -303,8 +306,7 @@ func HandleApiTaskDonePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p tasks.Task
-	p.ID = id
-	p, err := dbhandler.Todo.SelectWhereId(p)
+	p, err := dbhandler.Todo.GetTask(id)
 	if err != nil {
 		resJson, _ := json.Marshal(tasks.ResErr{Error: "Задача не найдена"})
 		SendHttp(resJson, w, http.StatusInternalServerError)
@@ -329,7 +331,8 @@ func HandleApiTaskDonePost(w http.ResponseWriter, r *http.Request) {
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
-	err = dbhandler.Todo.Update(p, next)
+	p.Date = next
+	err = dbhandler.Todo.UpdateDB(p)
 	if err == nil {
 		resJson := []byte("{}")
 		SendHttp(resJson, w, http.StatusOK)
@@ -350,9 +353,7 @@ func HandleApiTaskDelete(w http.ResponseWriter, r *http.Request) {
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
-	var p tasks.Task
-	p.ID = id
-	_, err := dbhandler.Todo.SelectWhereId(p)
+	_, err := dbhandler.Todo.GetTask(id)
 	if err != nil {
 		resJson, _ := json.Marshal(tasks.ResErr{Error: "Задача не найдена"})
 		SendHttp(resJson, w, http.StatusInternalServerError)
@@ -405,4 +406,55 @@ func HandleGetTasks(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	SendHttp(resJson, w, http.StatusOK)
+}
+
+// HandleApiAuthPost
+// возвращат подписаный токен в формате json
+func HandleApiAuthPost(w http.ResponseWriter, r *http.Request) {
+	// получаем пароль
+	var psw tasks.Password
+
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	if err = json.Unmarshal(buf.Bytes(), &psw); err != nil {
+		replyErr := tasks.ResErr{Error: "ошибка десериализации JSON"}
+		resJson, _ := json.Marshal(replyErr)
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusUnauthorized)
+		out := string(resJson)
+		w.Write([]byte(out))
+		return
+	}
+	if len(psw.Password) == 0 {
+		resJson, _ := json.Marshal(tasks.ResErr{Error: "Authentification required"})
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusUnauthorized)
+		out := string(resJson)
+		w.Write([]byte(out))
+		return
+	}
+	crc := sha256.Sum256([]byte(psw.Password))
+	hashString := hex.EncodeToString(crc[:])
+	// создаём payload
+	claims := jwt.MapClaims{
+		"passhash": hashString,
+		"roles":    "qwerty",
+	}
+	// создаём jwt и указываем payload
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// получаем подписанный токен
+	signedToken, err := jwtToken.SignedString([]byte(psw.Password))
+	if err != nil {
+		fmt.Printf("failed to sign jwt: %s\n", err)
+	}
+	// возвращаем токен в формате json. {"token" : signedToken}
+	resJson, _ := json.Marshal(tasks.ResJSON{Token: signedToken})
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	out := string(resJson)
+	w.Write([]byte(out))
 }

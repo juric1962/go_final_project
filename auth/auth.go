@@ -1,76 +1,20 @@
 package auth
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/juric1962/go_final_project/tasks"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var pass []byte
-
-// HandleApiAuthPost
-// возвращат подписаный токен в формате json
-func HandleApiAuthPost(w http.ResponseWriter, r *http.Request) {
-	// получаем пароль
-	var psw tasks.Password
-
-	var buf bytes.Buffer
-	pass = []byte(os.Getenv("TODO_PASSWORD"))
-	_, err := buf.ReadFrom(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-	if err = json.Unmarshal(buf.Bytes(), &psw); err != nil {
-		replyErr := tasks.ResErr{Error: "ошибка десериализации JSON"}
-		resJson, _ := json.Marshal(replyErr)
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		w.WriteHeader(http.StatusUnauthorized)
-		out := string(resJson)
-		w.Write([]byte(out))
-		return
-	}
-	if len(psw.Password) == 0 {
-		resJson, _ := json.Marshal(tasks.ResErr{Error: "Authentification required"})
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		w.WriteHeader(http.StatusUnauthorized)
-		out := string(resJson)
-		w.Write([]byte(out))
-		return
-	}
-	crc := sha256.Sum256([]byte(psw.Password))
-	hashString := hex.EncodeToString(crc[:])
-	// создаём payload
-	claims := jwt.MapClaims{
-		"passhash": hashString,
-		"roles":    "qwerty",
-	}
-	// создаём jwt и указываем payload
-	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	// получаем подписанный токен
-	signedToken, err := jwtToken.SignedString([]byte(psw.Password))
-	if err != nil {
-		fmt.Printf("failed to sign jwt: %s\n", err)
-	}
-	// возвращаем токен в формате json. {"token" : signedToken}
-	resJson, _ := json.Marshal(tasks.ResJSON{Token: signedToken})
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	out := string(resJson)
-	w.Write([]byte(out))
-}
+var Pass []byte
 
 func verifyUser(token string) bool {
 	jwtToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
-		return pass, nil
+		return Pass, nil
 	})
 	if err != nil {
 		fmt.Printf("Failed to parse token: %s\n", err)
@@ -91,7 +35,7 @@ func verifyUser(token string) bool {
 		fmt.Printf("failed to typecast to string")
 		return false
 	}
-	crc := sha256.Sum256([]byte(pass))
+	crc := sha256.Sum256([]byte(Pass))
 	hashString := hex.EncodeToString(crc[:])
 	return hashString == passhash
 }
@@ -124,7 +68,7 @@ func HandleApiAuthPostTestingCookie(w http.ResponseWriter, r *http.Request) {
 func AuthCookie(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// смотрим наличие пароля
-		if len(pass) > 0 {
+		if len(Pass) > 0 {
 			var jwt string // JWT-токен из куки
 			// получаем куку
 			cookie, err := r.Cookie("token")

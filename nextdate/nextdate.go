@@ -1,17 +1,10 @@
 package nextdate
 
 import (
-
-	//"io"
-
 	"errors"
 	"strconv"
 	"strings"
 	"time"
-
-	//	"github.com/jmoiron/sqlx"
-
-	//"github.com/juric1962/go_final_project/tasks"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -31,15 +24,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		11: 30,
 		12: 31,
 	}
-	//return time.Now().Format("20060102"), nil
 	err := errors.New("bad format")
-
-	// ////////////////
-
-	//if len(date) == 0 {
-	//	return time.Now().Format("20060102"), nil
-	//}
-
 	if len(date) != 8 {
 		return "", err
 	}
@@ -51,7 +36,6 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		return "", err
 	}
 	s := strings.SplitAfterN(date, "", 8)
-	//fmt.Println(s)
 	year, err0 := strconv.Atoi(s[0] + s[1] + s[2] + s[3])
 	month, err1 := strconv.Atoi(s[4] + s[5])
 	day, err2 := strconv.Atoi(s[6] + s[7])
@@ -67,24 +51,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 	if dayInMonth[month] < day {
 		return "", err
 	}
-
-	//if date == now.Format("20060102") {
-	//	return date, nil
-	//}
-
-	//if start.Before(now) && len(repeat) == 0 {
-	//	return now.Format("20060102"), nil
-	//}
-	//it is beter
-
-	//if start.After(now) {
-	//	return date, nil
-	//}
-
-	/////////////////
-
 	if repeat[0] == 'y' {
-
 		for {
 			next := start.AddDate(1, 0, 0)
 			if next.After(now) {
@@ -93,9 +60,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			}
 			start = next
 		}
-
 	}
-
 	if repeat[0] == 'd' {
 		va := strings.Split(repeat, " ")
 		if len(va) != 2 {
@@ -105,9 +70,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		if dayS <= 0 || dayS > 400 || err1 != nil {
 			return "", err
 		}
-
 		start, _ := time.Parse("20060102", date)
-
 		for {
 			next := start.AddDate(0, 0, dayS)
 			if next.After(now) {
@@ -115,10 +78,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 				return date, nil
 			}
 			start = next
-
 		}
-
 	}
-	// ///////
 	return "", err
 }

@@ -37,11 +37,11 @@ func (s TodoList) Add(p tasks.Task, next string) (int64, error) {
 	return id, nil
 }
 
-func (s TodoList) SelectWhereId(p tasks.Task) (tasks.Task, error) {
-	_, errc := strconv.Atoi(p.ID)
-	proba := "SELECT * FROM scheduler WHERE id = " + p.ID
+func (s TodoList) GetTask(id string) (tasks.Task, error) {
+	var p tasks.Task
+	_, errc := strconv.Atoi(id)
+	proba := "SELECT * FROM scheduler WHERE id = " + id
 	row := s.db.QueryRow(proba)
-	//err := row.Scan(&p.Date, &p.Title, &p.Comment, &p.Repeat)
 	err := row.Scan(&p.ID, &p.Date, &p.Title, &p.Comment, &p.Repeat)
 	if err == sql.ErrNoRows || errc != nil {
 		return p, err
@@ -50,19 +50,12 @@ func (s TodoList) SelectWhereId(p tasks.Task) (tasks.Task, error) {
 	}
 }
 
-func (s TodoList) Update(p tasks.Task, next string) error {
+func (s TodoList) UpdateDB(p tasks.Task) error {
 	_, err := s.db.Exec("UPDATE scheduler SET date = :date , title = :title, comment = :comment , repeat = :repeat WHERE id= :id",
-		sql.Named("date", next),
+		sql.Named("date", p.Date),
 		sql.Named("title", p.Title),
 		sql.Named("comment", p.Comment),
 		sql.Named("repeat", p.Repeat),
-		sql.Named("id", p.ID))
-	return err
-}
-
-func (s TodoList) UpdateDate(p tasks.Task, next string) error {
-	_, err := s.db.Exec("UPDATE scheduler SET date = :date  WHERE id= :id",
-		sql.Named("date", next),
 		sql.Named("id", p.ID))
 	return err
 }
@@ -77,7 +70,7 @@ func (s TodoList) Find(p tasks.Task, search string) ([]tasks.Task, error) {
 	var proba string
 	start, err1 := time.Parse("02.01.2006", search)
 	if err1 == nil {
-		proba = "SELECT * FROM scheduler WHERE date LIKE '%" + start.Format("20060102") + "%'"
+		proba = "SELECT * FROM scheduler WHERE date LIKE '%" + start.Format(tasks.TimeFormat) + "%'"
 	} else {
 		proba = "SELECT * FROM scheduler WHERE title LIKE '%" + search + "%'"
 	}
@@ -100,6 +93,7 @@ func (s TodoList) Find(p tasks.Task, search string) ([]tasks.Task, error) {
 func (s TodoList) SelectTasks(p tasks.Task) ([]tasks.Task, error) {
 	var countId int
 	res := []tasks.Task{}
+
 	row := s.db.QueryRow("SELECT count(id) from scheduler")
 	err := row.Scan(&countId)
 	if err != nil {
@@ -108,6 +102,7 @@ func (s TodoList) SelectTasks(p tasks.Task) ([]tasks.Task, error) {
 	if countId == 0 {
 		return res, err
 	}
+
 	var lastid int
 	row = s.db.QueryRow("SELECT * from scheduler order by id desc limit 1")
 	err = row.Scan(&lastid, &p.Date, &p.Title, &p.Comment, &p.Repeat)

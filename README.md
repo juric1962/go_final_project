@@ -75,5 +75,5 @@ TODO_PASSWORD= 123
 TODO_PORT= 7540
 TODO_DB = "./scheduler.db"
 # сборка и запуск контейнера
-docker build --tag go_final_project:v1 .
-docker run -it -p ${TODO_PORT}:${TODO_PORT} --mount type=bind,source=.,target=/app go_final_project:v1
+docker build --tag go_final_project:v3.0 .
+docker run -it -p ${TODO_PORT}:${TODO_PORT} --mount type=bind,source=.,target=/app go_final_project:v3.0

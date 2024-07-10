@@ -4,6 +4,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const TimeFormat = `20060102`
+
 // Task ...
 type Task struct {
 	ID      string `json:"id"`
