@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/juric1962/go_final_project/dbhandler"
 	"github.com/juric1962/go_final_project/nextdate"
+	"github.com/juric1962/go_final_project/store"
+
 	"github.com/juric1962/go_final_project/tasks"
 	_ "github.com/mattn/go-sqlite3"
 	_ "modernc.org/sqlite"
@@ -28,7 +28,7 @@ func SendHttp(load []byte, w http.ResponseWriter, status int) {
 
 // AddTask
 func AddTask(task tasks.Task, w http.ResponseWriter, next string) {
-	id, err := dbhandler.Todo.Add(task, next)
+	id, err := store.Todo.Add(task, next)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -44,14 +44,14 @@ func AddTask(task tasks.Task, w http.ResponseWriter, next string) {
 
 // UpdateTask
 func UpdateTask(task tasks.Task, w http.ResponseWriter, next string) {
-	_, err := dbhandler.Todo.GetTask(task.ID)
+	_, err := store.Todo.GetTask(task.ID)
 	if err != nil {
 		resJson, _ := json.Marshal(tasks.ResErr{Error: "Задача не найдена"})
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
 	task.Date = next
-	err = dbhandler.Todo.UpdateDB(task)
+	err = store.Todo.UpdateDB(task)
 	if err == nil {
 		resJson := []byte("{}")
 		SendHttp(resJson, w, http.StatusOK)
@@ -63,6 +63,11 @@ func UpdateTask(task tasks.Task, w http.ResponseWriter, next string) {
 	}
 }
 
+func HandlMain(w http.ResponseWriter, req *http.Request) {
+	fs := http.FileServer(http.Dir("./web"))
+	fs.ServeHTTP(w, req)
+}
+
 // HandleAPINextDay
 func HandleAPINextDay(w http.ResponseWriter, req *http.Request) {
 	now := req.FormValue("now")
@@ -71,104 +76,6 @@ func HandleAPINextDay(w http.ResponseWriter, req *http.Request) {
 	start, _ := time.Parse(tasks.TimeFormat, now)
 	res, _ := nextdate.NextDate(start, date, repeat)
 	SendHttp([]byte(res), w, http.StatusOK)
-}
-
-// HandleMain
-func HandleMain(w http.ResponseWriter, req *http.Request) {
-	htmlFile, err := os.ReadFile("./web/index.html")
-	if err != nil {
-		fmt.Printf("ошибка при чтении файла: %s", err.Error())
-		http.Error(w, " ошибка при чтении файла:", http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	out := string(htmlFile)
-	w.Write([]byte(out))
-}
-
-// HandleLogin
-func HandleLogin(w http.ResponseWriter, req *http.Request) {
-	htmlFile, err := os.ReadFile("./web/login.html")
-	if err != nil {
-		fmt.Printf("ошибка при чтении файла: %s", err.Error())
-		http.Error(w, " ошибка при чтении файла:", http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	out := string(htmlFile)
-	w.Write([]byte(out))
-}
-
-// HandleScript
-func HandleScript(w http.ResponseWriter, req *http.Request) {
-	htmlFile, err := os.ReadFile("./web/js/scripts.min.js")
-	if err != nil {
-		fmt.Printf("ошибка при чтении файла: %s", err.Error())
-		http.Error(w, " ошибка при чтении файла:", http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "text/javascript")
-	w.WriteHeader(http.StatusOK)
-	out := string(htmlFile)
-	w.Write([]byte(out))
-}
-
-// HandleAxios
-func HandleAxios(w http.ResponseWriter, req *http.Request) {
-	htmlFile, err := os.ReadFile("./web/js/axios.min.js")
-	if err != nil {
-		fmt.Printf("ошибка при чтении файла: %s", err.Error())
-		http.Error(w, " ошибка при чтении файла:", http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "text/javascript")
-	w.WriteHeader(http.StatusOK)
-	out := string(htmlFile)
-	w.Write([]byte(out))
-}
-
-// HandleStyle
-func HandleStyle(w http.ResponseWriter, req *http.Request) {
-	htmlFile, err := os.ReadFile("./web/css/style.css")
-	if err != nil {
-		fmt.Printf("ошибка при чтении файла: %s", err.Error())
-		http.Error(w, " ошибка при чтении файла:", http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	out := string(htmlFile)
-	w.Write([]byte(out))
-}
-
-// HandleTheme
-func HandleTheme(w http.ResponseWriter, req *http.Request) {
-	htmlFile, err := os.ReadFile("./web/css/theme.css")
-	if err != nil {
-		fmt.Printf("ошибка при чтении файла: %s", err.Error())
-		http.Error(w, " ошибка при чтении файла:", http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	out := string(htmlFile)
-	w.Write([]byte(out))
-}
-
-// HandleIco
-func HandleIco(w http.ResponseWriter, req *http.Request) {
-	htmlFile, err := os.ReadFile("./web/favicon.ico")
-	if err != nil {
-		fmt.Printf("ошибка при чтении файла: %s", err.Error())
-		http.Error(w, " ошибка при чтении файла:", http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "application/html")
-	w.WriteHeader(http.StatusOK)
-	out := string(htmlFile)
-	w.Write([]byte(out))
 }
 
 // HandleApiTaskPost
@@ -232,7 +139,7 @@ func HandleApiTaskGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p tasks.Task
-	p, err := dbhandler.Todo.GetTask(id)
+	p, err := store.Todo.GetTask(id)
 	if err == nil {
 		resJson, _ := json.Marshal(p)
 		SendHttp(resJson, w, http.StatusOK)
@@ -306,14 +213,14 @@ func HandleApiTaskDonePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p tasks.Task
-	p, err := dbhandler.Todo.GetTask(id)
+	p, err := store.Todo.GetTask(id)
 	if err != nil {
 		resJson, _ := json.Marshal(tasks.ResErr{Error: "Задача не найдена"})
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
 	if len(p.Repeat) == 0 {
-		err = dbhandler.Todo.Delete(id)
+		err = store.Todo.Delete(id)
 		if err != nil {
 			resJson, _ := json.Marshal(tasks.ResErr{Error: "can't delete task"})
 			SendHttp(resJson, w, http.StatusInternalServerError)
@@ -332,7 +239,7 @@ func HandleApiTaskDonePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Date = next
-	err = dbhandler.Todo.UpdateDB(p)
+	err = store.Todo.UpdateDB(p)
 	if err == nil {
 		resJson := []byte("{}")
 		SendHttp(resJson, w, http.StatusOK)
@@ -353,13 +260,13 @@ func HandleApiTaskDelete(w http.ResponseWriter, r *http.Request) {
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
-	_, err := dbhandler.Todo.GetTask(id)
+	_, err := store.Todo.GetTask(id)
 	if err != nil {
 		resJson, _ := json.Marshal(tasks.ResErr{Error: "Задача не найдена"})
 		SendHttp(resJson, w, http.StatusInternalServerError)
 		return
 	}
-	err = dbhandler.Todo.Delete(id)
+	err = store.Todo.Delete(id)
 	if err != nil {
 		resJson, _ := json.Marshal(tasks.ResErr{Error: "can't delete task"})
 		SendHttp(resJson, w, http.StatusInternalServerError)
@@ -377,7 +284,7 @@ func HandleGetTasks(w http.ResponseWriter, req *http.Request) {
 	p := tasks.Task{}
 	search := req.FormValue("search")
 	if len(search) != 0 {
-		res, err := dbhandler.Todo.Find(p, search)
+		res, err := store.Todo.Find(p, search)
 		if err != nil {
 			fmt.Printf("ошибка при чтении BD: %s", err.Error())
 			http.Error(w, " ошибка при чтении BD", http.StatusNoContent)
@@ -393,7 +300,7 @@ func HandleGetTasks(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// read list of tasks
-	res, err := dbhandler.Todo.SelectTasks(p)
+	res, err := store.Todo.SelectTasks(p)
 	if err != nil {
 		fmt.Printf("ошибка при чтении BD: %s", err.Error())
 		http.Error(w, " ошибка при чтении BD", http.StatusNoContent)
@@ -430,7 +337,7 @@ func HandleApiAuthPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(psw.Password) == 0 {
-		resJson, _ := json.Marshal(tasks.ResErr{Error: "Authentification required"})
+		resJson, _ := json.Marshal(tasks.ResErr{Error: "требуется аутентификация"})
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		w.WriteHeader(http.StatusUnauthorized)
 		out := string(resJson)

@@ -1,7 +1,8 @@
-package dbhandler
+package store
 
 import (
 	"database/sql"
+	"log"
 	"strconv"
 	"time"
 
@@ -40,14 +41,20 @@ func (s TodoList) Add(p tasks.Task, next string) (int64, error) {
 func (s TodoList) GetTask(id string) (tasks.Task, error) {
 	var p tasks.Task
 	_, errc := strconv.Atoi(id)
+	if errc != nil {
+		return p, errc
+	}
 	proba := "SELECT * FROM scheduler WHERE id = " + id
 	row := s.db.QueryRow(proba)
 	err := row.Scan(&p.ID, &p.Date, &p.Title, &p.Comment, &p.Repeat)
-	if err == sql.ErrNoRows || errc != nil {
-		return p, err
-	} else {
-		return p, nil
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return p, err
+		} else {
+			log.Fatal(err)
+		}
 	}
+	return p, nil
 }
 
 func (s TodoList) UpdateDB(p tasks.Task) error {
@@ -76,13 +83,20 @@ func (s TodoList) Find(p tasks.Task, search string) ([]tasks.Task, error) {
 	}
 	rows, err := s.db.Query(proba)
 	if err != nil {
-		return res, err
+		if err == sql.ErrNoRows {
+			return res, err
+		} else {
+			log.Fatal(err)
+		}
 	}
 	defer rows.Close()
 	for rows.Next() {
 		p := tasks.Task{}
 		err := rows.Scan(&p.ID, &p.Date, &p.Title, &p.Comment, &p.Repeat)
 		if err != nil {
+			if err = rows.Close(); err != nil {
+				log.Println(err)
+			}
 			return res, err
 		}
 		res = append(res, p)
@@ -91,38 +105,22 @@ func (s TodoList) Find(p tasks.Task, search string) ([]tasks.Task, error) {
 }
 
 func (s TodoList) SelectTasks(p tasks.Task) ([]tasks.Task, error) {
-	var countId int
 	res := []tasks.Task{}
-
-	row := s.db.QueryRow("SELECT count(id) from scheduler")
-	err := row.Scan(&countId)
+	rows, err := s.db.Query("SELECT * FROM scheduler order by date desc limit 10 ")
 	if err != nil {
-		return res, err
-	}
-	if countId == 0 {
-		return res, err
-	}
-
-	var lastid int
-	row = s.db.QueryRow("SELECT * from scheduler order by id desc limit 1")
-	err = row.Scan(&lastid, &p.Date, &p.Title, &p.Comment, &p.Repeat)
-	var IdLow int
-	if countId == 0 || err != nil {
-		return res, err
-	}
-	if countId > 10 {
-		IdLow = lastid - 10
-	} else {
-		IdLow = lastid - countId - 1
-	}
-	rows, err := s.db.Query("SELECT * FROM scheduler WHERE id between ? and ? order by date ", IdLow, lastid)
-	if err != nil {
-		return res, err
+		if err == sql.ErrNoRows {
+			return res, err
+		} else {
+			log.Fatal(err)
+		}
 	}
 	defer rows.Close()
 	for rows.Next() {
 		err := rows.Scan(&p.ID, &p.Date, &p.Title, &p.Comment, &p.Repeat)
 		if err != nil {
+			if err = rows.Close(); err != nil {
+				log.Println(err)
+			}
 			return res, err
 		}
 		res = append(res, p)

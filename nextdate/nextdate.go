@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juric1962/go_final_project/tasks"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -24,14 +25,14 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		11: 30,
 		12: 31,
 	}
-	err := errors.New("bad format")
+	err := errors.New("неправильный формат")
 	if len(date) != 8 {
 		return "", err
 	}
 	if len(repeat) == 0 {
 		return "", err
 	}
-	start, err1 := time.Parse("20060102", date)
+	start, err1 := time.Parse(tasks.TimeFormat, date)
 	if err1 != nil {
 		return "", err
 	}
@@ -55,7 +56,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		for {
 			next := start.AddDate(1, 0, 0)
 			if next.After(now) {
-				date := next.Format("20060102")
+				date := next.Format(tasks.TimeFormat)
 				return date, nil
 			}
 			start = next
@@ -70,11 +71,11 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		if dayS <= 0 || dayS > 400 || err1 != nil {
 			return "", err
 		}
-		start, _ := time.Parse("20060102", date)
+		start, _ := time.Parse(tasks.TimeFormat, date)
 		for {
 			next := start.AddDate(0, 0, dayS)
 			if next.After(now) {
-				date := next.Format("20060102")
+				date := next.Format(tasks.TimeFormat)
 				return date, nil
 			}
 			start = next

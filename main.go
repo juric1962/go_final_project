@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/juric1962/go_final_project/auth"
-	"github.com/juric1962/go_final_project/dbhandler"
 	"github.com/juric1962/go_final_project/handlers"
+	"github.com/juric1962/go_final_project/store"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -21,25 +21,19 @@ func main() {
 	}
 	port := os.Getenv("TODO_PORT")
 	if len(port) == 0 {
-		fmt.Println("не опрелен порт в переменной окружения TODO_PORT")
+		fmt.Println("не определен порт в переменной окружения TODO_PORT")
 		return
 	}
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		fmt.Println(" No data base !")
+		fmt.Println("невозможно подключиться к базе данных !")
 	}
 	defer db.Close()
-	dbhandler.Todo = dbhandler.NewTodoList(db)
+	store.Todo = store.NewTodoList(db)
 	auth.Pass = []byte(os.Getenv("TODO_PASSWORD"))
 	r := chi.NewRouter()
-	r.Get("/", handlers.HandleMain)
-	r.Get("/index.html", handlers.HandleMain)
-	r.Get("/login.html", handlers.HandleLogin)
-	r.Get("/js/scripts.min.js", handlers.HandleScript)
-	r.Get("/js/axios.min.js", handlers.HandleAxios)
-	r.Get("/css/style.css", handlers.HandleStyle)
-	r.Get("/css/theme.css", handlers.HandleTheme)
-	r.Get("/favicon.ico", handlers.HandleIco)
+	r.Get("/*", handlers.HandlMain)
+
 	r.Get("/api/nextdate", handlers.HandleAPINextDay)
 	r.Post("/api/signin", handlers.HandleApiAuthPost)
 
